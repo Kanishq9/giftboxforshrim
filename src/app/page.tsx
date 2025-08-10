@@ -24,6 +24,23 @@ export interface LetterItem {
   offsetY?: number
   zIndex?: number
 }
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+// 🔁 Save function for Firebase
+
+const saveLetter = async (data: any) => {
+  try {
+    const docRef = await addDoc(collection(db, "letters"), {
+      content: data,
+      createdAt: Date.now(),
+    });
+    alert(`Letter saved! Share this: /letter/${docRef.id}`);
+  } catch (error) {
+    alert("Failed to save letter.");
+    console.error("Save error:", error);
+  }
+};
+
 
 export default function DigitalLetterComposer() {
   const [items, setItems] = useState<LetterItem[]>([])
@@ -248,6 +265,15 @@ export default function DigitalLetterComposer() {
             onAddDoodle={() => setIsDoodleDrawerOpen(true)}
           />
         </div>
+        <div className="absolute bottom-20 right-4 z-40">
+  <button
+    onClick={() => saveLetter(items)}
+    className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow"
+  >
+    💾 Save Gift
+  </button>
+</div>
+
         {isPhotoUploaderOpen && (
           <PhotoUploader
             onClose={() => setIsPhotoUploaderOpen(false)}
