@@ -1,83 +1,64 @@
-import React, { useRef } from 'react'
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Camera, Upload } from 'lucide-react'
+"use client";
+
+import React, { useState } from "react";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { app } from "@/lib/firebase";
 
 interface PhotoUploaderProps {
-  onClose: () => void
-  onPhotoAdd: (photoUrl: string) => void
+  onClose: () => void;
+  onPhotoAdd: (url: string) => void;
 }
 
 export const PhotoUploader: React.FC<PhotoUploaderProps> = ({ onClose, onPhotoAdd }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        onPhotoAdd(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
-  }
+  };
 
-  const handleCameraCapture = async () => {
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      const video = document.createElement('video')
-      video.srcObject = stream
-      await video.play()
+      const storage = getStorage(app);
+      const storageRef = ref(storage, `photos/${Date.now()}-${file.name}`);
+      await uploadBytes(storageRef, file);
 
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      canvas.getContext('2d')?.drawImage(video, 0, 0)
-
-      const photoUrl = canvas.toDataURL('image/jpeg')
-      onPhotoAdd(photoUrl)
-
-      stream.getTracks().forEach(track => track.stop())
+      const downloadURL = await getDownloadURL(storageRef);
+      onPhotoAdd(downloadURL);
+      onClose();
     } catch (error) {
-      console.error('Error accessing camera:', error)
+      console.error("Error uploading file:", error);
+      alert("Failed to upload photo.");
+    } finally {
+      setUploading(false);
     }
-  }
+  };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add a photo</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Button 
-              variant="light"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col gap-2 h-auto py-4 rounded-xl"
-            >
-              <Upload className="h-8 w-8 text-stone-400" />
-              <span className="text-sm">Choose file</span>
-            </Button>
-            <Button 
-              variant="light"
-              onClick={handleCameraCapture}
-              className="flex flex-col gap-2 h-auto py-6 rounded-xl"
-            >
-              <Camera className="h-8 w-8 text-stone-400" />
-              <span className="text-sm t">Take photo</span>
-            </Button>
-          </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={handleFileChange}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
+    <div className="p-4 bg-white shadow-md rounded-lg">
+      <h2 className="text-lg font-bold mb-4">Upload a Photo</h2>
+      <input type="file" accept="image/*" onChange={handleFileChange} />
+      <div className="mt-4 flex gap-2">
+        <button
+          className="px-4 py-2 bg-gray-300 rounded"
+          onClick={onClose}
+          disabled={uploading}
+        >
+          Cancel
+        </button>
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded"
+          onClick={handleUpload}
+          disabled={!file || uploading}
+        >
+          {uploading ? "Uploading..." : "Upload"}
+        </button>
+      </div>
+    </div>
+  );
+};
